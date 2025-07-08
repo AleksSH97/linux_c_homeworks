@@ -19,7 +19,10 @@ int main(void) {
         return 1;
     }
 
-    sort_array(nums, SIZE_OF_ARRAY(nums));
+    err = sort_array(nums, SIZE_OF_ARRAY(nums));
+    if(err < 0) {
+        return 1;
+    }
 
     err = array_show(nums, SIZE_OF_ARRAY(nums));
     if(err < 0) {
