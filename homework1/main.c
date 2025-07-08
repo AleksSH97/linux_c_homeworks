@@ -1,7 +1,7 @@
 #include <stdlib.h>
 
-int  array_fill_with_rand_nums(int *array, size_t len);
-int  array_show(const int *array, size_t len);
+int array_fill_with_rand_nums(int *array, size_t len);
+int array_show(const int *array, size_t len);
 int sort_array(int *array, size_t len);
 
 #define SIZE_OF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
