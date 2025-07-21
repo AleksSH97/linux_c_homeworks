@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <time.h>
 
 int array_fill_with_rand_nums(int *array, size_t len);
 int array_show(const int *array, size_t len);
@@ -8,6 +9,9 @@ int sort_array(int *array, size_t len);
 
 int main(void) {
     int nums[10] = {0};
+
+    /* Update randomizer with new seed */
+    srand((unsigned int)time(NULL));
 
     int err = array_fill_with_rand_nums(nums, SIZE_OF_ARRAY(nums));
     if(err < 0) {
