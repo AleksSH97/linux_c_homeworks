@@ -5,12 +5,13 @@
 
 #define COUNT_TIMES 5
 
-pthread_mutex_t count_mutex     = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t condition_mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t  condition_cond  = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t  cond  = PTHREAD_COND_INITIALIZER;
 
 void *fn_thread1();
 void *fn_thread2();
+
+static volatile int turn = 1;
 
 int main(int argc, char **argv)
 {
@@ -30,20 +31,21 @@ void *fn_thread1()
     int count_thread = 0;
 
     while(count_thread < COUNT_TIMES) {
+        pthread_mutex_lock(&mtx);
+
+        while(turn != 1) {
+            pthread_cond_wait(&cond, &mtx);
+        }
+
         printf("Thread1: Tic\n\r");
-        sleep(1);
+        turn = 2;
 
-        pthread_cond_signal(&condition_cond);
-
-        pthread_mutex_lock(&condition_mutex);
-        pthread_cond_wait(&condition_cond, &condition_mutex);
-        pthread_mutex_unlock(&condition_mutex);
+        pthread_cond_signal(&cond);
+        pthread_mutex_unlock(&mtx);
 
         count_thread++;
     }
 
-    pthread_cond_signal(&condition_cond);
-    printf("Thread1: BREAK\n\r");
     return NULL;
 }
 
@@ -52,19 +54,19 @@ void *fn_thread2()
     int count_thread = 0;
 
     while(count_thread < COUNT_TIMES) {
-        pthread_mutex_lock(&condition_mutex);
-        pthread_cond_wait(&condition_cond, &condition_mutex);
-        pthread_mutex_unlock(&condition_mutex);
+        pthread_mutex_lock(&mtx);
+        while(turn != 2) {
+            pthread_cond_wait(&cond, &mtx);
+        }
 
         printf("Thread2: Tac\n\r");
-        sleep(1);
+        turn = 1;
 
-        pthread_cond_signal(&condition_cond);
+        pthread_cond_signal(&cond);
+        pthread_mutex_unlock(&mtx);
 
         count_thread++;
     }
 
-    pthread_cond_signal(&condition_cond);
-    printf("Thread2: BREAK\n\r");
     return NULL;
 }
