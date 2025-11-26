@@ -1,0 +1,1 @@
+savedcmd_array_sum_rand.ko := ld -r -m elf_x86_64 -z noexecstack --no-warn-rwx-segments --build-id=sha1  -T /usr/lib/modules/6.17.8-arch1-1/build/scripts/module.lds -o array_sum_rand.ko array_sum_rand.o array_sum_rand.mod.o .module-common.o
