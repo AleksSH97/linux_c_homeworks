@@ -1,16 +1,17 @@
-#include "module.h"
+#include "module_device.h"
 #include <linux/mutex.h>
 
-DEFINE_MUTEX(module_device_mutex);
+DEFINE_MUTEX(rand_nums_amount_mutex);
+EXPORT_SYMBOL(rand_nums_amount_mutex);
 long rand_nums_amount = 5; // Default random nums amount is 5
-char r_buffer[BUF_SIZE];
+char w_buffer[BUF_SIZE];
 
 void lock_writing_mutex(void) {
-    mutex_lock(&module_device_mutex);
+    mutex_lock(&rand_nums_amount_mutex);
 }
 
 void unlock_writing_mutex(void) {
-    mutex_unlock(&module_device_mutex);
+    mutex_unlock(&rand_nums_amount_mutex);
 }
 
 ssize_t node_write(struct file *file, const char *buffer, size_t length, loff_t* offset) {
@@ -27,7 +28,7 @@ ssize_t node_write(struct file *file, const char *buffer, size_t length, loff_t*
 
     ssize_t len = length;
 
-    for(p = r_buffer + ofs; len > 0; p++, len--, buffer++) {
+    for(p = w_buffer + ofs; len > 0; p++, len--, buffer++) {
         get_user(*p, buffer);
     }
 
@@ -35,23 +36,22 @@ ssize_t node_write(struct file *file, const char *buffer, size_t length, loff_t*
 
     *(p - 1) = '\0';
 
-    mutex_lock(&module_device_mutex);
+    mutex_lock(&rand_nums_amount_mutex);
 
-    int err = kstrtol(r_buffer, 10, &rand_nums_amount);
+    int err = kstrtol(w_buffer, 10, &rand_nums_amount);
     if(err < 0) {
-        mutex_unlock(&module_device_mutex);
+        mutex_unlock(&rand_nums_amount_mutex);
         printk(KERN_ALERT DEV_NAME " failed to convertert string to number: %d", err);
         return err;
     }
 
     if(rand_nums_amount <= 0 || rand_nums_amount > BUF_SIZE) {
-        rand_nums_amount = 5; // Reset to default value
-        mutex_unlock(&module_device_mutex);
         printk(KERN_ALERT DEV_NAME " wrong amount of random numbers: %ld", rand_nums_amount);
+        mutex_unlock(&rand_nums_amount_mutex);
         return -EINVAL;
     }
 
-    mutex_unlock(&module_device_mutex);
+    mutex_unlock(&rand_nums_amount_mutex);
     printk(KERN_ALERT DEV_NAME " changed amount of random numbers: %ld\n", rand_nums_amount);
 
     return length;

@@ -1,12 +1,17 @@
-#include "module.h"
+#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/cdev.h>
 #include <linux/kthread.h>
 #include <linux/delay.h>
 #include <linux/sched.h>
+#include <linux/slab.h>
+
+#include "module_device.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("User"); 
 
+#define MODULE_DEVICE_CHDEV_NAME "module_device_chdev"
 #define RAND_PERIOD_LOW_BOUNDARY  (1)
 #define RAND_PERIOD_HIGH_BOUNDARY (4)
 
@@ -18,7 +23,14 @@ static int module_device_init_res;
 
 static struct task_struct *thread;
 
-int nums_array[BUF_SIZE];
+int *nums_array = NULL;
+
+EXPORT_SYMBOL(nums_array);
+EXPORT_SYMBOL(rand_nums_amount);
+
+int module_device_init(void);
+void module_device_deinit(void);
+int thread_func(void *arg);
 
 static int create_device(void) {
     module_device_init_res = alloc_chrdev_region(&module_device_first, 0, 1, DEV_NAME);
@@ -27,7 +39,7 @@ static int create_device(void) {
         return module_device_init_res;
     }
 
-    module_device_class = class_create("chdevice");
+    module_device_class = class_create(MODULE_DEVICE_CHDEV_NAME);
     if(module_device_class == NULL) {
         unregister_chrdev_region(module_device_first, 1);
         printk(KERN_ALERT DEV_NAME " class has not been created\n");
@@ -96,13 +108,29 @@ static void sleep_for_rand_seconds(void) {
 
 int thread_func(void *arg) {
     char *dev_name = (char *)arg;
+    (void)dev_name;
 
-    printk(KERN_INFO DEV_NAME " thread dev name: %s", dev_name);
+    static long rand_nums_amount_current = 0;
+    rand_nums_amount_current = rand_nums_amount;
+    printk(KERN_INFO DEV_NAME " thread dev name: %s", DEV_NAME);
 
     while(!kthread_should_stop()) {
         sleep_for_rand_seconds();
         lock_writing_mutex(); // Wait if random numbers amount is being changed
-        generate_random_numbers(nums_array, rand_nums_amount);
+
+        if(rand_nums_amount_current != rand_nums_amount) {
+            kfree(nums_array); // Free dynamically allocated data
+            rand_nums_amount_current = rand_nums_amount; // Update current amount of random numbers to generate
+            nums_array = kmalloc((sizeof(int) * rand_nums_amount), GFP_KERNEL); // Allocate memory for an array of numbers
+            if(nums_array == NULL) {
+                printk(KERN_ALERT DEV_NAME " failed to allocate memory for %ld random numbers", rand_nums_amount);
+                break;
+            }
+            printk(KERN_INFO DEV_NAME " allocated %ld bytes for %ld random numbers", (sizeof(int) * rand_nums_amount), rand_nums_amount);
+        }
+
+        generate_random_numbers(nums_array, rand_nums_amount); // Generate chosen amount of random numbers
+
         unlock_writing_mutex();
     }
 
@@ -123,17 +151,27 @@ int module_device_init(void) {
         return err;
     }
 
+    nums_array = kmalloc((sizeof(int) * rand_nums_amount), GFP_KERNEL); // Initially allocate memory for an array of numbers
+    if(nums_array == NULL) {
+        printk(KERN_ALERT DEV_NAME " failed to allocate memory for %ld random numbers", rand_nums_amount);
+        return -ENOSYS;
+    }
+
     char thread_name[] = "module_device_thread";
 
     thread = kthread_create(thread_func, (void*)DEV_NAME, thread_name);
     if(!thread) {
         printk(KERN_ALERT DEV_NAME " kthreaddemo cannot start thread\n");
+        kfree(nums_array);
+        nums_array = NULL;
         kthread_stop(thread);
         return -ENOSYS;
     }
 
     get_task_struct(thread);
     wake_up_process(thread);
+
+    printk(KERN_ALERT DEV_NAME " started, initial amount of random numbers to generated: %ld\n", rand_nums_amount);
     
     return 0;
 }
@@ -148,6 +186,10 @@ void module_device_deinit(void) {
         kthread_stop(thread);
     }
     put_task_struct(thread);
+
+    if(nums_array) {
+        kfree(nums_array);
+    }
 
     printk(KERN_ALERT DEV_NAME " exited\n");
 }

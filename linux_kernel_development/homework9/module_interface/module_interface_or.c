@@ -1,4 +1,4 @@
-#include "module_device.h"
+#include "module_interface.h"
 
 DECLARE_WAIT_QUEUE_HEAD(WaitQ);
 static int already_opened = 0;

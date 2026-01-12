@@ -5,11 +5,9 @@
 #include <linux/random.h>
 
 #define DEV_NAME "module-device"
-
 #define BUF_SIZE (1024)
 
-extern char r_buffer[BUF_SIZE];
-extern int nums_array[BUF_SIZE];
+extern char w_buffer[BUF_SIZE];
 extern long rand_nums_amount;
 
 void lock_writing_mutex(void);
